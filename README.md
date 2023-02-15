@@ -15,6 +15,6 @@ The greedy solution is then fed to a simulated annealing (SA) algorithm to optim
 ## Example in Madrid
 Here I show an example in the city of Madrid where a salesman needs to go to 20 different locations and return to the initial starting point. Although the greedy algorithm provides a solution with just 78km (about half of a random route), the SA optimization steps minimizes this distance to just 66km. The starting and ending point is the green circle, the target locations are the red circles, and the route is shown in red. 
 
-![](https://github.com/pyubero/salesman_pb/main/figure_map.png)
+<img src="https://github.com/pyubero/salesman_pb/blob/main/figure_map.png" width="600">
 
-![](https://github.com/pyubero/salesman_pb/main/graph.png)
+<img src="https://github.com/pyubero/salesman_pb/blob/main/graph.png" width="400">
