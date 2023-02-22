@@ -4,17 +4,16 @@ Created on Mon Feb 13 13:11:35 2023
 
 @author: Pablo Yubero
 """
-
+# Necessary
 import numpy as np
-import geopandas as gpd
 from pyrosm import OSM, get_data
 import networkx as nx
 import osmnx as ox
-from pyrosm.data import sources
-import itertools
 
+# Optional
 from tqdm import tqdm
 from matplotlib import pyplot as plt
+from matplotlib import cm                                    
 
 
 
@@ -161,22 +160,42 @@ def SA_next_state(order, new_order, T, graph):
     else:
         return order, E0
     
-def compute_energy(routes, graph, type_):
+def compute_energy(routes : list, graph, type_ : str):
+    '''
+    Computes the energy of the route. The energy is a synonym here for "loss function",
+    the function that will be minimized during Simulated Annealing. 
+    In our case we can choose between two loss functions:
+        linear : the sum of distances of the route of each salesman
+        quadratic: the sum of squares of the distances of the route of each salesman
+        
+    By using the quadratic function, we also minimize the differences in distance between
+    routes of different salesmen. For example, a route of [3km 3km] won't be equivalent
+    to a different routing [6km 0km] in the quadratic case.
+    '''
+    
     seqs = [ sequence_to_routes(all_routes, rt) for rt in routes]
     lengths= np.array([routes_length(graph, s) for s in seqs])
-    # lengths = np.array([routes_length( graph, sequence_to_routes(all_routes, route ) ) for route in routes])
-    # print(lengths)
 
     if type_=="linear":    
         return np.sum(lengths)
+    
     elif type_ =="quadratic":
         return np.sqrt(np.sum(lengths**2))
 
+
 def k_permutation(order, circular=False ):
+    ''' 
+    In the list (order), two elements are selected at random and permuted.
     
-    idc = range(len(order))
+    The first element is **never** permuted. It is considered to be the starting
+    point of the route, and thus it should not change.
+    
+    The last element can permute only if circular is False.
+    '''
+    
+    idc = range(1,len(order))
     if circular: 
-        idc = idc[1:-1]
+        idc = idc[:-1]
     idc = np.random.permutation(idc )
     
     new_order = order.copy()
@@ -184,9 +203,10 @@ def k_permutation(order, circular=False ):
     new_order[ idc[1] ] = order[idc[0]]
     return new_order
 
+
 def get_temperature(n, nmax):
     # return 1-n/nmax
-    a = nmax**2 / 200
+    a = nmax**2 / 100
     b = n**2
     return 1/(1 + (b/a) )
 
@@ -228,26 +248,29 @@ def find_neighbor_state(routes, prob=0.5, circular=False):
     return order
 
 
-
-# Input variables
-x_, y_ = random_coordinates(N=40, bbox = [-3.7, 40.40, -3.65, 40.45] )
+###################
+# Input variables #
+x_, y_ = random_coordinates(N=30, bbox = [-3.7, 40.40, -3.65, 40.45] )
 map_name = "Madrid"
 route_type = "driving" #driving, walking, cycling
 temp_data_folder = "TEMP"
 circular = True
-N_SALESMEN = 4
+N_SALESMEN = 3
 starting_idx=0
+
 
 # Compute the bbox for the map
 # ... and extend it by some margin
 xspan = np.max(x_)-np.min(x_)
 yspan = np.max(y_)-np.min(y_)
-margin = np.max([xspan, yspan])/3
+margin = np.max([xspan, yspan])/8
 bbox_map= [ np.min(x_)-margin, np.min(y_)-margin, np.max(x_)+margin, np.max(y_)+margin]
+
 
 # Download map
 fp = get_data( map_name , directory = temp_data_folder)
 osm = OSM(fp ,bounding_box = bbox_map)
+
 
 # Create network and graph
 nodes,  edges = osm.get_network(nodes=True, network_type=route_type) # ~2mins
@@ -256,6 +279,7 @@ graph = ox.add_edge_speeds(graph )
 graph = ox.add_edge_travel_times(graph )
 
 target_nodes = list(np.unique(ox.nearest_nodes( graph, x_, y_ )))
+
 
 # Compute distance matrix
 dist, all_routes = compute_distances_and_routes(target_nodes, graph)
@@ -284,80 +308,54 @@ for n in tqdm(range(nmax)):
     order, E = SA_next_state(order, new_order, T, graph)
     all_E.append(E)
 
-plt.plot(all_E)
-plt.show()
-
 order_sa  = order.copy()
 routes_sa = [ sequence_to_routes(all_routes, rd) for rd in order_sa]
 print("")
 print("By using the new path you drive {:1.1f} units".format( np.min(all_E) - compute_energy(shortest_path, graph, type_="quadratic")))
 
 
-# #################
-# # Random sequence
-# # .. to test efficiency
-# mcmax=999
-# t_mc = []
-# for jj in tqdm( range(mcmax) ):
-#     sequence_mc = np.random.permutation( range(len(target_nodes))[1:])
-#     sequence_mc = np.append( 0, sequence_mc)
-#     if circular:
-#         sequence_mc = np.append( sequence_mc, 0)
-
-#     routes_mc = sequence_to_routes(all_routes, sequence_mc)
-#     t_mc.append(routes_length(graph, routes_mc) )
-
-# mc_mean = np.mean(t_mc)
-# mc_std  = np.std(t_mc)
-# print("")
-# print("length estimated by random: {:1.1f} +/- {:1.1f} km".format(mc_mean, mc_std) )
 
 
 
-# plt.figure(figsize=(5,3), dpi=300)
-# plt.plot(all_E,color=[0.2, 0.2, 0.2])
-# plt.hlines(total_length, 0, nmax, 'r')
-# plt.hlines( mc_mean, 0, nmax,'b')
-# plt.xlabel("Sim.Ann. time (steps)")
-# plt.ylabel('Traveling distance (km)')
-# plt.legend(("Sim.Ann.","Greedy alg.", "Random"))
-# plt.tight_layout()
-# plt.savefig('graph.png', dpi=300)
-
-# for n in range(N_SALESMEN):
-#     fig, ax = ox.plot_graph_routes(graph, routes_sa[n], 
-#                                     route_linewidth=2,
-#                                     orig_dest_size = 50,
-#                                     node_size=0,
-#                                     edge_linewidth=0.5,
-#                                     save=False,
-#                                     dpi=300,
-#                                     filepath="./map_greedy_{}.png".format(n)
-#                                     )
-
-
-from matplotlib import cm                                    
-def plot_route(route, ax, **kwargs):
+def plot_route(edges, route, ax, **kwargs):
     for rt in route:
-        assert False
-        edges[edges["u"].isin(rt)].plot(ax=ax, **kwargs)
+        idc = edges["u"].isin( rt[:-1]) & edges["v"].isin( rt[1:])
+        subt=edges[ idc ]
+        subt.plot(ax=ax, **kwargs)
+
+plt.figure( figsize=(6,3), dpi=300)
+p=plt.plot(range(nmax), all_E)
+plt.xlabel('Simulated annealing steps')
+ax =plt.gca()
+ax.set_ylabel('Energy (km)', color = p[0].get_color() )
+ax.tick_params(axis ='y', labelcolor = p[0].get_color())
+
+ax2 = ax.twinx() 
+ax2.set_ylabel('Temperature', color = 'r')
+ax2.plot(range(nmax), [max_temp*get_temperature(n, nmax)+0.001 for n in range(nmax)], color = 'r')
+ax2.tick_params(axis ='y', labelcolor = 'r')
+ 
+plt.show()
 
 
-colors= cm.get_cmap('viridis', N_SALESMEN).colors
 
-fig = plt.figure(figsize=(10,5), facecolor='k', frameon=False, dpi=300)
+colors = cm.get_cmap('viridis_r', N_SALESMEN+1).colors
+edge_color = 0.5*np.ones((3,))
+face_color = "#111111" #0.1*np.ones((3,))
+
+fig = plt.figure(figsize=(10,5), frameon=False, dpi=300)
 ax = plt.gca()
-ax.set_facecolor('w')
+ax.set_facecolor(face_color)
 ax.get_xaxis().set_visible(False)
 ax.get_yaxis().set_visible(False)
 
-edges.plot(ax=ax, linewidth=0.2, edgecolor=0.5*np.ones((3,)))
+edges.plot(ax=ax, linewidth=0.2, edgecolor=edge_color)
 
 for n in range(N_SALESMEN):
-    plot_route( routes_sa[n], ax, edgecolor=colors[n], linewidth=1, alpha=1)
+    plot_route( edges, routes_sa[n], ax, edgecolor=colors[n], linewidth=1, alpha=1)
 
-nodes[nodes["id"].isin(target_nodes)].plot(ax=ax, color='r', markersize=3, zorder=9999)
-nodes[nodes["id"]==target_nodes[starting_idx]].plot(ax=ax, color='k', markersize=8, zorder=9998)
+nodes[nodes["id"].isin(target_nodes)].plot(ax=ax, color='r', markersize=3, zorder=9998)
+nodes[nodes["id"]==target_nodes[starting_idx]].plot(ax=ax, color='g', markersize=8, zorder=9999)
 
 plt.tight_layout()
 
