@@ -24,6 +24,6 @@ Here I show an example in the city of Madrid where a salesman needs to go to 20 
 ## Example in Madrid with multiple salesmen
 Here I show another example with three salesmen. Again, the SA optimization steps minimizes the loss function, quadratic in this case. The starting and ending point is the green circle, the target locations are the red circles, and the route is shown in different colors for each salesman. 
 
-<img src="https://github.com/pyubero/salesman_pb/blob/main/figure_map_multiple.png" width="600">
+<img src="https://github.com/pyubero/salesman_pb/blob/main/figure_map_multiple.png" width="300">
 
 <img src="https://github.com/pyubero/salesman_pb/blob/main/graph_multiple.png" width="400">
