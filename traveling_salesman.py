@@ -97,7 +97,7 @@ def shortest_path_greedy(dist, starting_idx, circular = False):
     ddist[ dist==starting_idx]=np.inf
     
     order = [starting_idx,]     
-    for jj in range(len(target_nodes)-1):
+    for jj in range(len(dist)-1):
         idx = np.argmin( ddist[order[-1],:])
         ddist[:, order[-1]] = np.inf
         ddist[order[-1], :] = np.inf
